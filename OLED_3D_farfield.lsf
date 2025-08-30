@@ -1,0 +1,88 @@
+###############################################################################
+# OLED_3D_farfield.lsf
+#
+# This script file calculates the fraction of power radiated power based on the parameter sweep results.
+# It calculates the radiated power for with and without PC patterning. This script also caculates the
+# extraction efficiency and enhancement. Users will need to run the parameter sweep before analysing the resutls.
+###############################################################################
+
+closeall; clear; # close all figures and clear any old script variables to prevent confusion
+
+#########################################################
+# User inputs
+project_in_air = 1;	# if 1, look at fields projected to far field index of 1
+		        # if 0, look at fields projected in glass
+plot_all_wavelengths = 1;	# if 1, plot far field projection for case with patterning at
+			#       each wavelength and export figures as jpg images in the
+			#       working folder
+			# if 0, do not plot nor export figures
+#########################################################
+# run the parameter sweep if there are no sweep results
+if (havesweepresult!=1){
+ runsweep; save; 
+}
+
+# get dataset results from sweeps
+np_E2_far = getsweepresult("nopattern_dipole_orientation","E2_far");
+np_T_far = getsweepresult("nopattern_dipole_orientation","T_far");
+np_dipolePower = getsweepresult("nopattern_dipole_orientation","dipolePower");
+
+# pattern 
+pattern_E2_far = getsweepresult("pattern_dipole_positions_x","E2_far");
+pattern_T_far = getsweepresult("pattern_dipole_positions_x","T_far");
+pattern_dipolePower = getsweepresult("pattern_dipole_positions_x","dipolePower");
+
+# extract results from datasets
+np_dipole_power = np_dipolePower.dipole_power;
+np_dipole_box_power = np_dipolePower.dipole_power_box;
+np_source_power = np_dipolePower.source_power;
+
+dipole_power = pattern_dipolePower.dipole_power;
+dipole_box_power = pattern_dipolePower.dipole_power_box;
+source_power = pattern_dipolePower.source_power;
+ux = pattern_E2_far.ux;
+uy = pattern_E2_far.uy;
+
+if(project_in_air){ # if project in air
+  np_E2_far = np_E2_far.E2_far2;
+  np_T_far = np_T_far.T_far2;
+  E2_far = pattern_E2_far.E2_far2;
+  T_far = pattern_T_far.T_far2;
+} else{ # if project in glass
+  np_E2_far = np_E2_far.E2_far1;
+  np_T_far = np_T_far.T_far1;
+  E2_far = pattern_E2_far.E2_far1;
+  T_far = pattern_T_far.T_far1;
+}
+
+# plot dipolePower results
+select("source1");
+f = linspace(get("frequency start"),get("frequency stop"),length(np_source_power));
+#plot(c/f*1e6,np_dipole_power,np_dipole_box_power,dipole_power,dipole_box_power,
+	#"wavelength(um)","dipole power","Radiative decay rate enhancement");
+plot(c/f*1e6,np_dipole_power,dipole_power,
+	"wavelength(um)","dipole power","Radiative decay rate enhancement");
+#legend("no PC dipole","no PC box","PC dipole","PC box");
+legend("no PC dipole","PC dipole");
+
+# plot far field profile for case with patterning at all frequencies if plot_all_wavelengths = 1
+if(plot_all_wavelengths) {
+  for(fpoint=1:length(f)) { # for each frequency point
+    temp = num2str(round(c/f(fpoint)*1e9))+"nm"; # temp = current frequency
+    image(ux,uy,pinch(E2_far,3,fpoint),"","",temp,"polar");
+    pause(0.1); # for better viewing
+    exportfigure("OLED_"+temp);
+  }
+}
+
+# plot extraction efficiency over wavelength for patterned and unpatterened case
+plot(c/f*1e9,T_far,np_T_far,"wavelength (nm)","fraction of power radiated","Extraction efficiency");
+legend("extracted power (pattern)",
+       "extracted power (no pattern)");
+#exportfigure("OLED_extraction_efficiency");
+
+# calculate and plot the enhancement 
+enhancement = T_far/np_T_far;
+plot(c/f*1e9,enhancement,"wavelength (nm)","enhancement","Extraction efficiency enhancement");
+#exportfigure("OLED_extraction_efficiency_enhancement");
+
